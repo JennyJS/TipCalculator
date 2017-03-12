@@ -9,6 +9,10 @@
 import UIKit
 import SnapKit
 
+let BILL_AMOUNT_KEY = "BILL_AMOUNT_KEY"
+let BILL_AMOUNT_CACHED_TS_KEY = "BILL_AMOUNT_CACHED_TS_KEY"
+let REMEMBER_BILL_AMOUNT_TIME_WINDOW_SEC = 10 * 60
+
 class ViewController: UIViewController, UITextFieldDelegate {
     
     let HORIZONTAL_MARGIN = 12;
@@ -45,12 +49,31 @@ class ViewController: UIViewController, UITextFieldDelegate {
         _addLineSeparator()
         _addTotalSection()
         
-        let tapGesturRecognizer = UITapGestureRecognizer(target: self, action: #selector(_handleTap));
         self.view.isUserInteractionEnabled = true
-        self.view.addGestureRecognizer(tapGesturRecognizer)
+        _maybeSetCachedBillAmount()
     }
     
     // MARK: Calcualtion Logic
+    
+    func _formatBillAmount(billAmount: NSNumber) -> String? {
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .decimal
+        return fmt.string(from: billAmount)
+    }
+    
+    // Remembering the bill amount across app restarts (if <10mins)
+    func _maybeSetCachedBillAmount() {
+        let prevBillAmount = UserDefaults.standard.string(forKey: BILL_AMOUNT_KEY)
+        let prevBillAmountCachedTS = UserDefaults.standard.integer(forKey: BILL_AMOUNT_CACHED_TS_KEY)
+        let currentTS = Int(NSDate().timeIntervalSince1970)
+        if (currentTS - prevBillAmountCachedTS < REMEMBER_BILL_AMOUNT_TIME_WINDOW_SEC) {
+            if (prevBillAmount != nil) {
+                billTextField.text = prevBillAmount
+                billAmount = Double(prevBillAmount!)!
+                _recalcaulteTotalAndUpdateUI()
+            }
+        }
+    }
     
     func _recalcaulteTotalAndUpdateUI() {
         tipAmount = billAmount * tipPercent
@@ -81,7 +104,14 @@ class ViewController: UIViewController, UITextFieldDelegate {
     // MARK: UI Event
     
     func _billDidChange(_ textField: UITextField) {
-        billAmount = Double(textField.text ?? "0") ?? 0
+        let filteredString = textField.text?.replacingOccurrences(of: ",", with: "")
+        billAmount = Double(filteredString ?? "0") ?? 0
+        textField.text = _formatBillAmount(billAmount: NSNumber(value: billAmount))
+        if (filteredString?.characters.last == ".") {
+            textField.text = textField.text! + "."
+        }
+        UserDefaults.standard.set(filteredString, forKey: BILL_AMOUNT_KEY)
+        UserDefaults.standard.set(Int(NSDate().timeIntervalSince1970), forKey: BILL_AMOUNT_CACHED_TS_KEY)
         _recalcaulteTotalAndUpdateUI()
     }
     
@@ -106,11 +136,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
         self.navigationController?.pushViewController(settingViewController, animated: true);
     }
     
-    func _handleTap(sender: UITapGestureRecognizer? = nil) {
-        self.view.endEditing(false);
-    }
-    
-    // MARK: UI
+    // MARK: UI Setup
     
     func _addBillingSection() {
         view.addSubview(billContainer);
@@ -141,6 +167,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
         billTextField.textColor = UIColor.gray
         billTextField.keyboardType = UIKeyboardType.decimalPad
         billTextField.textAlignment = .right
+        billTextField.becomeFirstResponder()
         billTextField.addTarget(self, action: #selector(_billDidChange), for: .editingChanged)
         
         let underline = UIView()
@@ -245,13 +272,6 @@ class ViewController: UIViewController, UITextFieldDelegate {
         totalAmountLabel.textColor = UIColor.darkGray;
         totalAmountLabel.font = UIFont.boldSystemFont(ofSize: 38);
     }
-
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
-
-
+    
 }
 
