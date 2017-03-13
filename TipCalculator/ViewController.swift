@@ -67,9 +67,10 @@ class ViewController: UIViewController, UITextFieldDelegate {
         let prevBillAmountCachedTS = UserDefaults.standard.integer(forKey: BILL_AMOUNT_CACHED_TS_KEY)
         let currentTS = Int(NSDate().timeIntervalSince1970)
         if (currentTS - prevBillAmountCachedTS < REMEMBER_BILL_AMOUNT_TIME_WINDOW_SEC) {
-            if (prevBillAmount != nil) {
-                billTextField.text = prevBillAmount
-                billAmount = Double(prevBillAmount!)!
+            if (prevBillAmount != nil && (prevBillAmount?.characters.count)! > 0) {
+                let prevBillAmountDouble = Double(prevBillAmount!)!
+                billTextField.text = _formatBillAmount(billAmount: NSNumber(value: prevBillAmountDouble))
+                billAmount = prevBillAmountDouble
                 _recalcaulteTotalAndUpdateUI()
             }
         }
@@ -83,14 +84,14 @@ class ViewController: UIViewController, UITextFieldDelegate {
                           duration: 0.25,
                           options: [.transitionCrossDissolve],
                           animations: {
-                            self.tipAmountLabel.text = String(self.tipAmount)
+                            self.tipAmountLabel.text = self._formatBillAmount(billAmount: NSNumber(value: self.tipAmount))
         }, completion: nil)
         
         UIView.transition(with: totalAmountLabel,
                           duration: 0.25,
                           options: [.transitionCrossDissolve],
                           animations: {
-                            self.totalAmountLabel.text = String(self.totalAmount)
+                            self.totalAmountLabel.text = self._formatBillAmount(billAmount: NSNumber(value: self.totalAmount))
         }, completion: nil)
     }
     
